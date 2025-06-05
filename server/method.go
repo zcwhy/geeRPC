@@ -20,35 +20,7 @@ type MethodType struct {
 }
 
 func (m *MethodType) newArg() reflect.Value {
-	var v reflect.Value
-	if m.arg.Kind() == reflect.Ptr {
-		v = reflect.New(m.arg.Elem())
-	} else {
-		v = reflect.New(m.arg)
-	}
-
-	return v
-}
-
-// reply的类型一定是ptr
-func (m *MethodType) newReply() reflect.Value {
-	return reflect.New(m.reply.Elem())
-}
-
-func (s *Server) Register(rcvr any) error {
-	t := reflect.TypeOf(rcvr)
-	v := reflect.ValueOf(rcvr)
-
-	service := &serviceType{
-		rcvr:   reflect.ValueOf(rcvr),
-		method: filterMethods(t),
-	}
-	service.name = t.Name()
-	if v.Kind() == reflect.Ptr {
-		service.name = reflect.Indirect(v).Type().Name()
-	}
-	s.serviceMap[service.name] = service
-	return nil
+	return reflect.New(m.arg)
 }
 
 func filterMethods(typ reflect.Type) map[string]*MethodType {

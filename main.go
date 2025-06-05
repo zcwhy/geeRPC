@@ -10,6 +10,7 @@ import (
 func main() {
 	go func() {
 		srv := server.NewServer()
+		srv.Register(server.TestStruct{})
 		srv.Run(":8080")
 	}()
 
@@ -19,10 +20,9 @@ func main() {
 		panic(err)
 	}
 
+	args := 1
 	var resp string
-	//args := &server.Args{Num1: 1, Num2: 2}
-	//time.Sleep(1 * time.Second)
 
-	fmt.Println(c.Call("Foo.Sum", "123", &resp))
+	fmt.Println(c.Call("TestStruct.TestFunc1", args, &resp))
 	fmt.Println(resp)
 }

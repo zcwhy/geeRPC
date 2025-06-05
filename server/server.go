@@ -5,6 +5,7 @@ import (
 	"geerpc/codec"
 	"log"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -53,56 +54,56 @@ func (s *Server) serveRequests(c codec.Codec) {
 			break
 		}
 
-		//req.ServiceMethod
+		service, method, err := s.findHandler(req.ServiceMethod)
+		if err != nil {
+			log.Printf("rpc server: find handler error: %v", err)
+			return
+		}
 
-		// TODO: now we don't know the type of request argv
-		// day 1, just suppose it's string
-		var argv string
-		if err := c.ReadBody(&argv); err != nil {
+		argvType := method.arg
+		argv := reflect.New(argvType)
+		if err := c.ReadBody(argv.Interface()); err != nil {
 			log.Println("rpc server: read argv err:", err)
 		}
 
-		fmt.Println("[server] 123", argv)
-
-		fmt.Println("[server] handle request:", req)
 		wg.Add(1)
-		go s.handleRequest(req, c, wg)
+		go s.handleRequest(req, service, method, argv, c, wg)
 	}
 	wg.Wait()
 }
 
-func (s *Server) handleRequest(reqHeader *codec.Header, c codec.Codec, wg *sync.WaitGroup) {
+func (s *Server) handleRequest(reqHeader *codec.Header, sType *serviceType, mType *MethodType, argv reflect.Value, c codec.Codec, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	//cmd := reqHeader.ServiceMethod
-	//strings.Split(cmd, ".")
-	//
-	//sType, mType, err := s.findHandler(reqHeader.ServiceMethod)
-	//if err != nil {
-	//	log.Printf("[handleRequest] error: %v", err)
-	//	return
-	//}
-	//
-	//arg := mType.newArg()
-	//reply := mType.newReply()
-	//
-	//c.ReadBody(arg.Interface())
+	reply := reflect.New(mType.reply.Elem())
+	f := mType.method.Func
+	f.Call([]reflect.Value{sType.rcvr, argv.Elem(), reply})
 
-	//f := mType.method.Func
-	//if mType.arg.Kind() != reflect.Ptr {
-	//	arg = arg.Elem()
-	//}
-	//f.Call([]reflect.Value{sType.rcvr, arg, reply})
-
-	if err := c.Write(reqHeader, "Hello, world"); err != nil {
+	if err := c.Write(reqHeader, reply.Interface()); err != nil {
 		log.Printf("rpc server: write rpc struct error: %v", err)
 	}
+}
+
+func (s *Server) Register(rcvr any) error {
+	t := reflect.TypeOf(rcvr)
+	v := reflect.ValueOf(rcvr)
+
+	service := &serviceType{
+		rcvr:   reflect.ValueOf(rcvr),
+		method: filterMethods(t),
+	}
+	service.name = t.Name()
+	if v.Kind() == reflect.Ptr {
+		service.name = reflect.Indirect(v).Type().Name()
+	}
+	s.serviceMap[service.name] = service
+	return nil
 }
 
 func (s *Server) findHandler(serviceMethod string) (*serviceType, *MethodType, error) {
 	dot := strings.LastIndex(serviceMethod, ".")
 	if dot < 0 {
-		log.Println("")
+		return nil, nil, fmt.Errorf("rpc server: service/method request ill-formed: %v", serviceMethod)
 	}
 
 	service, method := serviceMethod[:dot], serviceMethod[dot+1:]
@@ -114,7 +115,7 @@ func (s *Server) findHandler(serviceMethod string) (*serviceType, *MethodType, e
 
 	mType, ok := srvType.method[method]
 	if !ok {
-
+		return nil, nil, fmt.Errorf("[findHandler] failed to find handler for serviceMethod %s", serviceMethod)
 	}
 
 	return srvType, mType, nil

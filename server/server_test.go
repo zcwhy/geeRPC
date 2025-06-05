@@ -1,22 +1,26 @@
 package server
 
-type TestStruct struct{}
+import (
+	"reflect"
+	"testing"
+)
 
-func (s TestStruct) TestFunc1(arg int, reply *string) error {
-	return nil
+func TestServer(t *testing.T) {
+	s := NewServer()
+	s.Register(TestStruct{})
+	t.Log(s.findHandler("TestStruct.TestFunc1"))
 }
 
-// just 1 arg
-func (s TestStruct) TestFunc2(arg int) error {
-	return nil
+func TestNewArgv(t *testing.T) {
+	i := 1
+	argvType := reflect.TypeOf(i)
+
+	argv := reflect.New(argvType)
+	t.Log(argv.Kind() == reflect.Ptr)
+	t.Log(argv.Elem().Kind())
 }
 
-// two return
-func (s TestStruct) TestFunc3(arg int, reply *string) (int, error) {
-	return 0, nil
-}
-
-// second arg not a pointer
-func (s TestStruct) TestFunc4(arg int, reply string) error {
-	return nil
+func TestReflect(t *testing.T) {
+	//temp := "Hello world!"
+	//reply := &temp
 }
