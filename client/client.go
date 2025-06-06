@@ -1,6 +1,8 @@
 package client
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"geerpc/codec"
 	"log"
@@ -24,8 +26,14 @@ type Call struct {
 	error         error
 }
 
-func Dial(addr string) (client *Client, err error) {
-	conn, err := net.Dial("tcp", addr)
+func Dial(addr string, opts ...OptionFunc) (client *Client, err error) {
+	option := &Options{}
+	for _, opt := range opts {
+		opt(option)
+	}
+
+	conn, err := net.DialTimeout("tcp", addr, option.DialTimeOut)
+
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +58,15 @@ func NewClient(conn net.Conn) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) Call(serviceMethod string, args any, reply any) error {
-	cc := <-c.Go(serviceMethod, args, reply).done
-	return cc.error
+func (c *Client) Call(ctx context.Context, serviceMethod string, args any, reply any) error {
+	call := c.Go(serviceMethod, args, reply)
+
+	select {
+	case <-ctx.Done():
+		return errors.New("rpc client: call failed: " + ctx.Err().Error())
+	case <-call.done:
+		return call.error
+	}
 }
 
 func (c *Client) Go(serviceMethod string, args any, reply any) *Call {
@@ -74,8 +88,6 @@ func (c *Client) send(call *Call) {
 		Seq:           call.id,
 		ServiceMethod: call.serviceMethod,
 	}
-
-	fmt.Println("[send] 111111", req, call.args)
 
 	c.pending[call.id] = call
 	if err := c.cc.Write(&req, call.args); err != nil {
