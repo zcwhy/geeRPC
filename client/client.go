@@ -7,6 +7,8 @@ import (
 	"geerpc/codec"
 	"log"
 	"net"
+	"net/http"
+	"strings"
 )
 
 var NextSeq uint64 = 0
@@ -121,7 +123,20 @@ func (c *Client) receive() {
 	}
 }
 
+func Invoke(ctx context.Context, serviceMethod string, args any, reply any) error {
+	getServiceAddr(serviceMethod)
+}
+
 func getSeq() uint64 {
 	NextSeq++
 	return NextSeq
+}
+
+func getServiceAddr() {
+	var registry string
+	resp, err := http.Get(registry)
+	if err != nil {
+		log.Println("rpc registry refresh err:", err)
+	}
+	servers := strings.Split(resp.Header.Get("X-Geerpc-Servers"), ",")
 }

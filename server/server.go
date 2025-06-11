@@ -5,6 +5,7 @@ import (
 	"geerpc/codec"
 	"log"
 	"net"
+	"net/http"
 	"reflect"
 	"strings"
 	"sync"
@@ -12,6 +13,8 @@ import (
 
 type Server struct {
 	serviceMap map[string]*serviceType
+	registry   string
+	address    string
 }
 
 func NewServer() *Server {
@@ -97,6 +100,10 @@ func (s *Server) Register(rcvr any) error {
 		service.name = reflect.Indirect(v).Type().Name()
 	}
 	s.serviceMap[service.name] = service
+
+	if len(s.registry) != 0 {
+		s.registerService(service.name)
+	}
 	return nil
 }
 
@@ -119,4 +126,16 @@ func (s *Server) findHandler(serviceMethod string) (*serviceType, *MethodType, e
 	}
 
 	return srvType, mType, nil
+}
+
+func (s *Server) registerService(serviceName string) error {
+	httpClient := &http.Client{}
+	req, _ := http.NewRequest("POST", s.registry, nil)
+	req.Header.Set("X-Geerpc-Server", serviceName+s.registry)
+	if _, err := httpClient.Do(req); err != nil {
+		log.Println("rpc server: heart beat err:", err)
+		return err
+	}
+
+	return nil
 }
