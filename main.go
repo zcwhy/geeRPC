@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"geerpc/client"
 	"geerpc/server"
@@ -23,6 +24,6 @@ func main() {
 	args := 1
 	var resp string
 
-	fmt.Println(c.Call("TestStruct.TestFunc1", args, &resp))
+	fmt.Println(c.Call(context.Background(), "TestStruct.TestFunc1", args, &resp))
 	fmt.Println(resp)
 }
